@@ -59,6 +59,16 @@ impl fmt::Display for Scale {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for Scale {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&format!("{}", self))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Reg {
     // 8-bit registers
@@ -212,6 +222,22 @@ impl serde::Serialize for Op {
                 tup.serialize_element(")")?;
                 tup.end()
             }
+            Op::Ind {
+                disp: None,
+                base: Some(base),
+                index: Some(index),
+                scale: Some(scale),
+            } => {
+                let mut tup = serializer.serialize_tuple(3)?;
+                tup.serialize_element("(")?;
+                tup.serialize_element(base)?;
+                tup.serialize_element(",")?;
+                tup.serialize_element(index)?;
+                tup.serialize_element(",")?;
+                tup.serialize_element(scale)?;
+                tup.serialize_element(")")?;
+                tup.end()
+            }
             _ => unimplemented!(),
         }
     }
@@ -286,5 +312,20 @@ fn test_serialize() {
         ))
         .unwrap(),
         r#"{"span":[1,1],"child":["(",{"span":[1,1,7],"child":"%edx"},")"]}"#,
+    );
+    assert_eq!(
+        &serde_json::to_string(&Spanning(
+            Op::Ind {
+                disp: None,
+                base: Some(Spanning(Reg::Ebx, 2, 1, Some(0b111))),
+                index: Some(Spanning(Reg::Ebx, 2, 1, Some(0b111 << 3))),
+                scale: Some(Spanning(Scale::One, 2, 1, Some(0b11 << 6))),
+            },
+            2,
+            1,
+            None,
+        ))
+        .unwrap(),
+        r#"{"span":[2,1],"child":["(",{"span":[2,1,7],"child":"%ebx"},",",{"span":[2,1,56],"child":"%ebx"},",",{"span":[2,1,192],"child":"1"},")"]}"#,
     );
 }

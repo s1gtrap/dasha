@@ -58,7 +58,7 @@ impl<'a> ByteExt for &'a Spanning<u8> {
             },
             self.1,
             self.2,
-            Some(0b111000),
+            Some(0b111 << 3),
         )
     }
 
@@ -142,6 +142,14 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
             .and_then(|mrr| -> Result<_, _> {
                 Ok(Spanning(
                     match mrr.mode() {
+                        Mode::Indirect if mrr.rm(Size::Long).0 == Reg::Esp => {
+                            self.get(1).ok_or(Error::ExpectedSib).map(|sib| Op::Ind {
+                                disp: None,
+                                base: Some(sib.base(Size::Long)),
+                                index: Some(sib.index(Size::Long)),
+                                scale: Some(sib.scale()),
+                            })?
+                        }
                         Mode::Indirect => Op::Ind {
                             disp: None,
                             base: Some(mrr.rm(Size::Long)),

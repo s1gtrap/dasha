@@ -238,11 +238,15 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn disasm(mut code: &[Spanning<u8>]) -> Result<Vec<Spanning<Inst>>, Error> {
+pub fn disasm<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
+where
+    I: IntoIterator<Item = Spanning<u8>>,
+{
+    let mut code = &i.into_iter().collect::<Vec<_>>()[..];
     let mut insts = vec![];
     while !code.is_empty() {
         let inst;
-        (inst, code) = match code {
+        (inst, code) = match &code[..] {
             [Spanning(0x00, oss, osl, _), ref tail @ ..] => (
                 Spanning(
                     Inst::AddRegOp(tail.reg(Size::Byte)?, tail.rm(Size::Byte)?),

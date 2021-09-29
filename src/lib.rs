@@ -33,6 +33,15 @@ where
     }
 }
 
+impl<T> fmt::Display for Spanning<T>
+where
+    T: fmt::Display + Clone,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Size {
     Byte,
@@ -170,6 +179,16 @@ pub enum Inst {
     AddRegOp(Spanning<Reg>, Spanning<Op>),
     AddOpReg(Spanning<Op>, Spanning<Reg>),
     AddImmReg(Spanning<i128>, Spanning<Reg>),
+}
+
+impl fmt::Display for Inst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Inst::AddRegOp(src, dst) => write!(f, "add {}, {}", src, dst),
+            Inst::AddOpReg(src, dst) => write!(f, "add {}, {}", src, dst),
+            Inst::AddImmReg(src, dst) => write!(f, "add {}, {}", src, dst),
+        }
+    }
 }
 
 #[cfg(feature = "serde")]

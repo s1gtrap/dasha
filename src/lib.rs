@@ -7,13 +7,11 @@ mod dis;
 pub use dis::{disasm, Error};
 
 #[derive(Clone)]
-pub struct Spanning<T>(pub T, pub usize, pub usize, pub Option<u8>)
-where
-    T: Clone;
+pub struct Spanning<T>(pub T, pub usize, pub usize, pub Option<u8>);
 
 impl<T> PartialEq for Spanning<T>
 where
-    T: Clone + PartialEq,
+    T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0 && self.1 == self.1 && self.2 == other.2 && self.3 == self.3

@@ -133,7 +133,9 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
     }
 
     fn reg(self, size: Size) -> Result<Spanning<Reg>, Error> {
-        self.get(0).map(|mrr| mrr.reg(size)).ok_or(Error::ExpectedMrr)
+        self.get(0)
+            .map(|mrr| mrr.reg(size))
+            .ok_or(Error::ExpectedMrr)
     }
 
     fn rm(self, size: Size) -> Result<Spanning<Op>, Error> {

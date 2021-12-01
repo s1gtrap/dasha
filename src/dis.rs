@@ -16,12 +16,12 @@ enum Mode {
 
 trait ByteExt {
     fn mode(self) -> Mode;
-    fn reg(self, sz: Size) -> Spanning<Reg>;
-    fn rm(self, sz: Size) -> Spanning<Reg>;
+    fn reg(self, size: Size) -> Spanning<Reg>;
+    fn rm(self, size: Size) -> Spanning<Reg>;
 
     fn scale(self) -> Spanning<Scale>;
-    fn index(self, sz: Size) -> Spanning<Reg>;
-    fn base(self, sz: Size) -> Spanning<Reg>;
+    fn index(self, size: Size) -> Spanning<Reg>;
+    fn base(self, size: Size) -> Spanning<Reg>;
 }
 
 impl<'a> ByteExt for &'a Spanning<u8> {
@@ -35,9 +35,9 @@ impl<'a> ByteExt for &'a Spanning<u8> {
         }
     }
 
-    fn reg(self, sz: Size) -> Spanning<Reg> {
+    fn reg(self, size: Size) -> Spanning<Reg> {
         Spanning(
-            match (self.0 >> 3 & 0b111, sz) {
+            match (self.0 >> 3 & 0b111, size) {
                 (0b000, Size::Byte) => Reg::Al,
                 (0b001, Size::Byte) => Reg::Cl,
                 (0b010, Size::Byte) => Reg::Dl,
@@ -62,9 +62,9 @@ impl<'a> ByteExt for &'a Spanning<u8> {
         )
     }
 
-    fn rm(self, sz: Size) -> Spanning<Reg> {
+    fn rm(self, size: Size) -> Spanning<Reg> {
         Spanning(
-            match (self.0 & 0b111, sz) {
+            match (self.0 & 0b111, size) {
                 (0b000, Size::Byte) => Reg::Al,
                 (0b001, Size::Byte) => Reg::Cl,
                 (0b010, Size::Byte) => Reg::Dl,
@@ -104,19 +104,19 @@ impl<'a> ByteExt for &'a Spanning<u8> {
         )
     }
 
-    fn index(self, sz: Size) -> Spanning<Reg> {
-        self.reg(sz)
+    fn index(self, size: Size) -> Spanning<Reg> {
+        self.reg(size)
     }
 
-    fn base(self, sz: Size) -> Spanning<Reg> {
-        self.rm(sz)
+    fn base(self, size: Size) -> Spanning<Reg> {
+        self.rm(size)
     }
 }
 
 trait ByteSliceExt<'a> {
     fn mode(self) -> Option<Mode>;
-    fn reg(self, sz: Size) -> Result<Spanning<Reg>, Error>;
-    fn rm(self, sz: Size) -> Result<Spanning<Op>, Error>;
+    fn reg(self, size: Size) -> Result<Spanning<Reg>, Error>;
+    fn rm(self, size: Size) -> Result<Spanning<Op>, Error>;
     fn inst_len(self) -> Result<usize, Error>;
     fn inst_split(self) -> Result<Option<(&'a [Spanning<u8>], &'a [Spanning<u8>])>, Error>;
 }
@@ -132,11 +132,11 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
         })
     }
 
-    fn reg(self, sz: Size) -> Result<Spanning<Reg>, Error> {
-        self.get(0).map(|mrr| mrr.reg(sz)).ok_or(Error::ExpectedMrr)
+    fn reg(self, size: Size) -> Result<Spanning<Reg>, Error> {
+        self.get(0).map(|mrr| mrr.reg(size)).ok_or(Error::ExpectedMrr)
     }
 
-    fn rm(self, sz: Size) -> Result<Spanning<Op>, Error> {
+    fn rm(self, size: Size) -> Result<Spanning<Op>, Error> {
         self.get(0)
             .ok_or(Error::ExpectedMrr)
             .and_then(|mrr| -> Result<_, _> {
@@ -148,6 +148,7 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                                 base: Some(sib.base(Size::Long)),
                                 index: Some(sib.index(Size::Long)),
                                 scale: Some(sib.scale()),
+                                size,
                             })?
                         }
                         Mode::Indirect => Op::Ind {
@@ -155,6 +156,7 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                             base: Some(mrr.rm(Size::Long)),
                             index: None,
                             scale: None,
+                            size,
                         },
                         Mode::ByteDisp => Op::Ind {
                             disp: Some({
@@ -164,6 +166,7 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                             base: Some(mrr.rm(Size::Long)),
                             index: None,
                             scale: None,
+                            size,
                         },
                         Mode::LongDisp => Op::Ind {
                             disp: Some({
@@ -185,8 +188,9 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                             base: Some(mrr.rm(Size::Long)),
                             index: None,
                             scale: None,
+                            size,
                         },
-                        Mode::Direct => Op::Dir(mrr.rm(sz).0),
+                        Mode::Direct => Op::Dir(mrr.rm(size).0),
                     },
                     mrr.1,
                     mrr.2,

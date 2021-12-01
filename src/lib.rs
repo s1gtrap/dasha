@@ -42,11 +42,21 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Size {
     Byte,
     Word,
     Long,
+}
+
+impl fmt::Display for Size {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Size::Byte => write!(f, "b"),
+            Size::Word => write!(f, "w"),
+            Size::Long => write!(f, "l"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -101,6 +111,24 @@ pub enum Reg {
     Edi,
 }
 
+impl Reg {
+    pub fn size(self) -> Size {
+        match self {
+            Reg::Al | Reg::Cl | Reg::Dl | Reg::Bl | Reg::Ah | Reg::Ch | Reg::Dh | Reg::Bh => {
+                Size::Byte
+            }
+            Reg::Eax
+            | Reg::Ecx
+            | Reg::Edx
+            | Reg::Ebx
+            | Reg::Esp
+            | Reg::Ebp
+            | Reg::Esi
+            | Reg::Edi => Size::Long,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Op {
     Dir(Reg),
@@ -109,7 +137,17 @@ pub enum Op {
         base: Option<Spanning<Reg>>,
         index: Option<Spanning<Reg>>,
         scale: Option<Spanning<Scale>>,
+        size: Size,
     },
+}
+
+impl Op {
+    pub fn size(&self) -> Size {
+        match self {
+            Op::Dir(reg) => reg.size(),
+            Op::Ind { size, .. } => *size,
+        }
+    }
 }
 
 impl fmt::Display for Reg {
@@ -144,30 +182,35 @@ impl fmt::Display for Op {
                 base: None,
                 index: None,
                 scale: None,
+                ..
             } => unreachable!(),
             Op::Ind {
                 disp: None,
                 base: Some(Spanning(base, _, _, _)),
                 index: None,
                 scale: None,
+                ..
             } => write!(f, "({})", base),
             Op::Ind {
                 disp: Some(Spanning(disp, _, _, _)),
                 base: Some(Spanning(base, _, _, _)),
                 index: None,
                 scale: None,
+                ..
             } => write!(f, "{}({})", disp, base),
             Op::Ind {
                 disp: None,
                 base: Some(Spanning(base, _, _, _)),
                 index: Some(Spanning(index, _, _, _)),
                 scale: Some(Spanning(scale, _, _, _)),
+                ..
             } => write!(f, "({}, {}, {})", base, index, scale),
             Op::Ind {
                 disp: Some(Spanning(disp, _, _, _)),
                 base: Some(Spanning(base, _, _, _)),
                 index: Some(Spanning(index, _, _, _)),
                 scale: Some(Spanning(scale, _, _, _)),
+                ..
             } => write!(f, "{}({}, {}, {})", disp, base, index, scale),
             op => unimplemented!("{:?}", op),
         }
@@ -181,12 +224,21 @@ pub enum Inst {
     AddImmReg(Spanning<i128>, Spanning<Reg>),
 }
 
+impl Inst {
+    pub fn size(&self) -> Size {
+        match self {
+            Inst::AddRegOp(_, ref op) | Inst::AddOpReg(ref op, _) => op.0.size(),
+            Inst::AddImmReg(_, reg) => reg.0.size(),
+        }
+    }
+}
+
 impl fmt::Display for Inst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Inst::AddRegOp(src, dst) => write!(f, "add {}, {}", src, dst),
-            Inst::AddOpReg(src, dst) => write!(f, "add {}, {}", src, dst),
-            Inst::AddImmReg(src, dst) => write!(f, "add {}, {}", src, dst),
+            Inst::AddRegOp(src, dst) => write!(f, "add{} {}, {}", dst.0.size(), src, dst),
+            Inst::AddOpReg(src, dst) => write!(f, "add{} {}, {}", src.0.size(), src, dst),
+            Inst::AddImmReg(src, dst) => write!(f, "add{} {}, {}", dst.0.size(), src, dst),
         }
     }
 }
@@ -215,12 +267,14 @@ impl serde::Serialize for Op {
                 base: None,
                 index: None,
                 scale: None,
+                ..
             } => unreachable!(),
             Op::Ind {
                 disp: Some(disp),
                 base: Some(base),
                 index: None,
                 scale: None,
+                ..
             } => {
                 let mut tup = serializer.serialize_tuple(4)?;
                 tup.serialize_element(disp)?;
@@ -234,6 +288,7 @@ impl serde::Serialize for Op {
                 base: Some(base),
                 index: None,
                 scale: None,
+                ..
             } => {
                 let mut tup = serializer.serialize_tuple(3)?;
                 tup.serialize_element("(")?;
@@ -246,6 +301,7 @@ impl serde::Serialize for Op {
                 base: Some(base),
                 index: Some(index),
                 scale: Some(scale),
+                ..
             } => {
                 let mut tup = serializer.serialize_tuple(3)?;
                 tup.serialize_element("(")?;
@@ -324,6 +380,7 @@ fn test_serialize() {
                 base: Some(Spanning(Reg::Edx, 1, 1, Some(0b00000111))),
                 index: None,
                 scale: None,
+                size: Size::Byte,
             },
             1,
             1,
@@ -339,6 +396,7 @@ fn test_serialize() {
                 base: Some(Spanning(Reg::Ebx, 2, 1, Some(0b111))),
                 index: Some(Spanning(Reg::Ebx, 2, 1, Some(0b111 << 3))),
                 scale: Some(Spanning(Scale::One, 2, 1, Some(0b11 << 6))),
+                size: Size::Byte,
             },
             2,
             1,

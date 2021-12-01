@@ -296,6 +296,102 @@ fn test_dasha_disasm() {
             None,
         )]),
     );
+    // addl %eax, %eax    [opcode + mod-reg-r/m]
+    assert_eq!(
+        dasha::disasm([Spanning(0x01, 0, 1, None), Spanning(0x00, 1, 1, None)]),
+        Ok(vec![Spanning(
+            Inst::AddRegOp(
+                Spanning(Reg::Eax, 1, 1, Some(0b111 << 3)),
+                Spanning(
+                    Op::Ind {
+                        disp: None,
+                        base: Some(Spanning(Reg::Eax, 2, 1, Some(0b111))),
+                        index: None,
+                        scale: None,
+                        size: Size::Long,
+                    },
+                    1,
+                    1,
+                    None,
+                ),
+            ),
+            0,
+            2,
+            None,
+        )]),
+    );
+    // addl %ecx, 0x0(%ecx)    [opcode + mod-reg-r/m + disp8]
+    assert_eq!(
+        dasha::disasm([
+            Spanning(0x01, 0, 1, None),
+            Spanning(0x49, 1, 1, None),
+            Spanning(0x00, 2, 1, None),
+        ]),
+        Ok(vec![Spanning(
+            Inst::AddRegOp(
+                Spanning(Reg::Ecx, 1, 1, Some(0b111 << 3)),
+                Spanning(
+                    Op::Ind {
+                        disp: Some(Spanning(0x00, 2, 1, None)),
+                        base: Some(Spanning(Reg::Ecx, 1, 1, Some(0b111))),
+                        index: None,
+                        scale: None,
+                        size: Size::Long,
+                    },
+                    1,
+                    1,
+                    None,
+                ),
+            ),
+            0,
+            3,
+            None,
+        )]),
+    );
+    // addl %edx, 0x7fffffff(%edx)    [opcode + mod-reg-r/m + disp32]
+    assert_eq!(
+        dasha::disasm([
+            Spanning(0x01, 0, 1, None),
+            Spanning(0x92, 1, 1, None),
+            Spanning(0xff, 2, 1, None),
+            Spanning(0xff, 3, 1, None),
+            Spanning(0xff, 4, 1, None),
+            Spanning(0x7f, 5, 1, None),
+        ]),
+        Ok(vec![Spanning(
+            Inst::AddRegOp(
+                Spanning(Reg::Edx, 1, 1, Some(0b111 << 3)),
+                Spanning(
+                    Op::Ind {
+                        disp: Some(Spanning(0x7fffffff, 2, 4, None)),
+                        base: Some(Spanning(Reg::Edx, 1, 1, Some(0b111))),
+                        index: None,
+                        scale: None,
+                        size: Size::Long,
+                    },
+                    1,
+                    1,
+                    None,
+                ),
+            ),
+            0,
+            6,
+            None,
+        )]),
+    );
+    // addl %ebx, %ebx    [opcode + mod-reg-r/m]
+    assert_eq!(
+        dasha::disasm([Spanning(0x01, 0, 1, None), Spanning(0xdb, 1, 1, None)]),
+        Ok(vec![Spanning(
+            Inst::AddRegOp(
+                Spanning(Reg::Ebx, 1, 1, Some(0b111 << 3)),
+                Spanning(Op::Dir(Reg::Ebx), 1, 1, Some(0b111)),
+            ),
+            0,
+            2,
+            None,
+        )]),
+    );
 
     // TODO: addb %al, (%esp)
 }

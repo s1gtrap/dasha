@@ -247,11 +247,12 @@ impl fmt::Display for Error {
 fn reg_op<'a>(
     f: &dyn Fn(Spanning<Reg>, Spanning<Op>) -> Inst,
     s: &'a [Spanning<u8>],
+    sz: Size,
 ) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
     match s {
         &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
             Spanning(
-                f(tail.reg(Size::Byte)?, tail.rm(Size::Byte)?),
+                f(tail.reg(sz)?, tail.rm(sz)?),
                 oss,
                 tail.inst_split()?
                     .ok_or(Error::PartialInst)?
@@ -276,7 +277,8 @@ where
     while !code.is_empty() {
         let inst;
         (inst, code) = match &code[..] {
-            [Spanning(0x00, _, _, _), ..] => reg_op(&Inst::AddRegOp, code)?,
+            [Spanning(0x00, _, _, _), ..] => reg_op(&Inst::AddRegOp, code, Size::Byte)?,
+            [Spanning(0x01, _, _, _), ..] => reg_op(&Inst::AddRegOp, code, Size::Long)?,
             _ => unimplemented!("{:?}", code),
         };
         insts.push(inst);

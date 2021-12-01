@@ -244,6 +244,29 @@ impl fmt::Display for Error {
     }
 }
 
+fn reg_op<'a>(
+    f: &dyn Fn(Spanning<Reg>, Spanning<Op>) -> Inst,
+    s: &'a [Spanning<u8>],
+) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
+    match s {
+        &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
+            Spanning(
+                f(tail.reg(Size::Byte)?, tail.rm(Size::Byte)?),
+                oss,
+                tail.inst_split()?
+                    .ok_or(Error::PartialInst)?
+                    .0
+                    .last()
+                    .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
+                    .unwrap_or(osl),
+                None,
+            ),
+            tail.inst_split()?.ok_or(Error::PartialInst)?.1,
+        )),
+        _ => unreachable!(),
+    }
+}
+
 pub fn disasm<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
 where
     I: IntoIterator<Item = Spanning<u8>>,
@@ -253,20 +276,7 @@ where
     while !code.is_empty() {
         let inst;
         (inst, code) = match &code[..] {
-            [Spanning(0x00, oss, osl, _), ref tail @ ..] => (
-                Spanning(
-                    Inst::AddRegOp(tail.reg(Size::Byte)?, tail.rm(Size::Byte)?),
-                    *oss,
-                    tail.inst_split()?
-                        .ok_or(Error::PartialInst)?
-                        .0
-                        .last()
-                        .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
-                        .unwrap_or(*osl),
-                    None,
-                ),
-                tail.inst_split()?.ok_or(Error::PartialInst)?.1,
-            ),
+            [Spanning(0x00, _, _, _), ..] => reg_op(&Inst::AddRegOp, code)?,
             _ => unimplemented!("{:?}", code),
         };
         insts.push(inst);

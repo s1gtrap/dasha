@@ -268,6 +268,30 @@ fn reg_op<'a>(
     }
 }
 
+fn op_reg<'a>(
+    f: &dyn Fn(Spanning<Op>, Spanning<Reg>) -> Inst,
+    s: &'a [Spanning<u8>],
+    sz: Size,
+) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
+    match s {
+        &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
+            Spanning(
+                f(tail.rm(sz)?, tail.reg(sz)?),
+                oss,
+                tail.inst_split()?
+                    .ok_or(Error::PartialInst)?
+                    .0
+                    .last()
+                    .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
+                    .unwrap_or(osl),
+                None,
+            ),
+            tail.inst_split()?.ok_or(Error::PartialInst)?.1,
+        )),
+        _ => unreachable!(),
+    }
+}
+
 pub fn disasm<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
 where
     I: IntoIterator<Item = Spanning<u8>>,
@@ -279,6 +303,8 @@ where
         (inst, code) = match &code[..] {
             [Spanning(0x00, _, _, _), ..] => reg_op(&Inst::AddRegOp, code, Size::Byte)?,
             [Spanning(0x01, _, _, _), ..] => reg_op(&Inst::AddRegOp, code, Size::Long)?,
+            [Spanning(0x02, _, _, _), ..] => op_reg(&Inst::AddOpReg, code, Size::Byte)?,
+            [Spanning(0x03, _, _, _), ..] => op_reg(&Inst::AddOpReg, code, Size::Long)?,
             _ => unimplemented!("{:?}", code),
         };
         insts.push(inst);

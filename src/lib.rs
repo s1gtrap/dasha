@@ -3,11 +3,18 @@
 use std::fmt;
 
 mod dis;
+pub mod text;
 
 pub use dis::{disasm, Error};
 
 #[derive(Clone)]
 pub struct Spanning<T>(pub T, pub usize, pub usize, pub Option<u8>);
+
+impl<T> Spanning<T> {
+    fn map<U>(self, f: fn(T) -> U) -> Spanning<U> {
+        Spanning(f(self.0), self.1, self.2, self.3)
+    }
+}
 
 impl<T> PartialEq for Spanning<T>
 where

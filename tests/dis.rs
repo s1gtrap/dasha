@@ -451,6 +451,16 @@ fn test_dasha_disasm() {
             None,
         )]),
     );
+    // addb $-0x80, %al    [opcode + imm8]
+    assert_eq!(
+        dasha::disasm([Spanning(0x04, 0, 1, None), Spanning(0x80, 1, 1, None),]),
+        Ok(vec![Spanning(
+            Inst::AddImmReg(Spanning(-0x80, 1, 1, None), Spanning(Reg::Al, 0, 1, None)),
+            0,
+            2,
+            None,
+        )]),
+    );
 
     // TODO: addb %al, (%esp)
 }

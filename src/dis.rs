@@ -119,6 +119,10 @@ trait ByteSliceExt<'a> {
     fn rm(self, size: Size) -> Result<Spanning<Op>, Error>;
     fn inst_len(self) -> Result<usize, Error>;
     fn inst_split(self) -> Result<Option<(&'a [Spanning<u8>], &'a [Spanning<u8>])>, Error>;
+
+    fn prim<I>(self) -> Option<I>
+    where
+        I: Fixed;
 }
 
 impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
@@ -219,6 +223,31 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
         let len = self.inst_len()?;
         Ok(self.get(..len).map(|head| (head, self.get(len..).unwrap())))
     }
+
+    fn prim<I>(self) -> Option<I>
+    where
+        I: Fixed,
+    {
+        I::from_slice(self)
+    }
+}
+
+trait Fixed: Sized {
+    fn from_slice(s: &[Spanning<u8>]) -> Option<Self>;
+}
+
+impl Fixed for Spanning<u8> {
+    fn from_slice(s: &[Spanning<u8>]) -> Option<Self> {
+        s.get(0).cloned()
+    }
+}
+
+impl Fixed for Spanning<i8> {
+    fn from_slice(s: &[Spanning<u8>]) -> Option<Self> {
+        s.get(0)
+            .cloned()
+            .map(|Spanning(a, b, c, d)| Spanning(a as _, b, c, d))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -227,7 +256,16 @@ pub enum Error {
     ExpectedSib,
     ExpectedByteDisp,
     ExpectedLongDisp,
+    ExpectedByteImm,
+    ExpectedLongImm,
     PartialInst,
+    Text(crate::text::Error),
+}
+
+impl From<crate::text::Error> for Error {
+    fn from(other: crate::text::Error) -> Self {
+        Error::Text(other)
+    }
 }
 
 impl error::Error for Error {}
@@ -239,7 +277,10 @@ impl fmt::Display for Error {
             Error::ExpectedSib => write!(f, "expected sib byte"),
             Error::ExpectedByteDisp => write!(f, "expected byte disp (1 byte)"),
             Error::ExpectedLongDisp => write!(f, "expected long disp (4 bytes)"),
+            Error::ExpectedByteImm => write!(f, "expected byte imm (1 byte)"),
+            Error::ExpectedLongImm => write!(f, "expected long imm (4 bytes)"),
             Error::PartialInst => write!(f, "partial/incomplete instruction"),
+            Error::Text(e) => write!(f, "text error: {}", e),
         }
     }
 }
@@ -292,6 +333,35 @@ fn op_reg<'a>(
     }
 }
 
+fn imm_reg<'a>(
+    f: &dyn Fn(Spanning<i128>, Spanning<Reg>) -> Inst,
+    s: &'a [Spanning<u8>],
+    sz: Size,
+) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
+    match s {
+        &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
+            Spanning(
+                f(
+                    tail.get(0)
+                        .map(|&Spanning(i, s, l, b)| Spanning(i as _, s, l, b))
+                        .ok_or(Error::ExpectedByteImm)?,
+                    tail.reg(sz)?,
+                ),
+                oss,
+                tail.inst_split()?
+                    .ok_or(Error::PartialInst)?
+                    .0
+                    .last()
+                    .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
+                    .unwrap_or(osl),
+                None,
+            ),
+            tail.inst_split()?.ok_or(Error::PartialInst)?.1,
+        )),
+        _ => unreachable!(),
+    }
+}
+
 pub fn disasm<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
 where
     I: IntoIterator<Item = Spanning<u8>>,
@@ -305,6 +375,20 @@ where
             [Spanning(0x01, _, _, _), ..] => reg_op(&Inst::AddRegOp, code, Size::Long)?,
             [Spanning(0x02, _, _, _), ..] => op_reg(&Inst::AddOpReg, code, Size::Byte)?,
             [Spanning(0x03, _, _, _), ..] => op_reg(&Inst::AddOpReg, code, Size::Long)?,
+            [Spanning(0x04, s, l, _), ref tail @ ..] => tail
+                .prim::<Spanning<i8>>()
+                .ok_or(Error::ExpectedByteImm)
+                .map(|s @ Spanning(_, ss, sl, _)| -> (_, _) {
+                    (
+                        Spanning(
+                            Inst::AddImmReg(s.map(|i| i as _), Spanning(Reg::Al, ss, sl, None)),
+                            ss,
+                            2,
+                            None,
+                        ),
+                        tail.get(1..).unwrap(),
+                    )
+                })?,
             _ => unimplemented!("{:?}", code),
         };
         insts.push(inst);
@@ -332,4 +416,42 @@ fn test_byte_slice_ext_inst_len() {
     assert_eq!([Spanning(0xc4, 0, 2, None)].as_ref().inst_len(), Ok(1)); // mod-reg-r/m
     assert_eq!([Spanning(0xfc, 0, 2, None)].as_ref().inst_len(), Ok(1)); // mod-reg-r/m
     assert_eq!([Spanning(0xff, 0, 2, None)].as_ref().inst_len(), Ok(1)); // mod-reg-r/m
+}
+
+#[test]
+fn test_byte_slice_ext_prim() {
+    assert_eq!([].as_ref().prim::<Spanning<u8>>(), None);
+    assert_eq!(
+        [Spanning(0x00, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
+        Some(Spanning(0x00, 0, 1, None)),
+    );
+    assert_eq!(
+        [Spanning(0x7f, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
+        Some(Spanning(0x7f, 0, 1, None)),
+    );
+    assert_eq!(
+        [Spanning(0x80, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
+        Some(Spanning(0x80, 0, 1, None)),
+    );
+    assert_eq!(
+        [Spanning(0xff, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
+        Some(Spanning(0xff, 0, 1, None)),
+    );
+    assert_eq!([].as_ref().prim::<Spanning<i8>>(), None);
+    assert_eq!(
+        [Spanning(0x00, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
+        Some(Spanning(0x00, 0, 1, None)),
+    );
+    assert_eq!(
+        [Spanning(0x7f, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
+        Some(Spanning(0x7f, 0, 1, None)),
+    );
+    assert_eq!(
+        [Spanning(0x80, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
+        Some(Spanning(-0x80, 0, 1, None)),
+    );
+    assert_eq!(
+        [Spanning(0xff, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
+        Some(Spanning(-0x1, 0, 1, None)),
+    );
 }

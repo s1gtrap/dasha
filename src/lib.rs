@@ -3,9 +3,11 @@
 use std::fmt;
 
 mod dis;
+mod parent;
 pub mod text;
 
 pub use dis::{disasm, Error};
+pub use parent::{Frag, Parent};
 
 #[derive(Clone)]
 pub struct Spanning<T>(pub T, pub usize, pub usize, pub Option<u8>);
@@ -47,6 +49,12 @@ where
     }
 }
 
+impl parent::Parent for Spanning<i128> {
+    fn children(&self) -> Vec<parent::Frag> {
+        vec![parent::Frag::Leaf(format!("{}", self))]
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Size {
     Byte,
@@ -80,6 +88,12 @@ impl fmt::Display for Scale {
             Scale::Four => write!(f, "4"),
             Scale::Eight => write!(f, "8"),
         }
+    }
+}
+
+impl parent::Parent for Spanning<Scale> {
+    fn children(&self) -> Vec<parent::Frag> {
+        vec![parent::Frag::Leaf(format!("{}", self))]
     }
 }
 
@@ -222,6 +236,77 @@ impl fmt::Display for Op {
     }
 }
 
+impl parent::Parent for Spanning<Op> {
+    fn children(&self) -> Vec<parent::Frag> {
+        match &self.0 {
+            Op::Dir(reg) => vec![parent::Frag::Leaf(format!("{}", reg))],
+            Op::Ind {
+                disp: None,
+                base: None,
+                index: None,
+                scale: None,
+                ..
+            } => unreachable!(),
+            Op::Ind {
+                disp: None,
+                base: Some(base),
+                index: None,
+                scale: None,
+                ..
+            } => vec![
+                parent::Frag::Leaf("(".into()),
+                parent::Frag::Branch(Box::new(base.clone())),
+                parent::Frag::Leaf(")".into()),
+            ],
+            Op::Ind {
+                disp: Some(disp),
+                base: Some(base),
+                index: None,
+                scale: None,
+                ..
+            } => vec![
+                parent::Frag::Branch(Box::new(disp.clone())),
+                parent::Frag::Leaf("(".into()),
+                parent::Frag::Branch(Box::new(base.clone())),
+                parent::Frag::Leaf(")".into()),
+            ],
+            Op::Ind {
+                disp: None,
+                base: Some(base),
+                index: Some(index),
+                scale: Some(scale),
+                ..
+            } => vec![
+                parent::Frag::Leaf("(".into()),
+                parent::Frag::Branch(Box::new(base.clone())),
+                parent::Frag::Leaf(", ".into()),
+                parent::Frag::Branch(Box::new(index.clone())),
+                parent::Frag::Leaf(", ".into()),
+                parent::Frag::Branch(Box::new(scale.clone())),
+                parent::Frag::Leaf(")".into()),
+            ],
+            Op::Ind {
+                disp: Some(Spanning(disp, _, _, _)),
+                base: Some(Spanning(base, _, _, _)),
+                index: Some(Spanning(index, _, _, _)),
+                scale: Some(Spanning(scale, _, _, _)),
+                ..
+            } => vec![
+                parent::Frag::Leaf("(".into()),
+                parent::Frag::Leaf(format!("{}", base)),
+                parent::Frag::Leaf("(".into()),
+            ],
+            op => unimplemented!("{:?}", op),
+        }
+    }
+}
+
+impl parent::Parent for Spanning<Reg> {
+    fn children(&self) -> Vec<parent::Frag> {
+        vec![parent::Frag::Leaf(format!("{}", self))]
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Inst {
     AddRegOp(Spanning<Reg>, Spanning<Op>),
@@ -244,6 +329,21 @@ impl fmt::Display for Inst {
             Inst::AddRegOp(src, dst) => write!(f, "add{} {}, {}", dst.0.size(), src, dst),
             Inst::AddOpReg(src, dst) => write!(f, "add{} {}, {}", src.0.size(), src, dst),
             Inst::AddImmReg(src, dst) => write!(f, "add{} {}, {}", dst.0.size(), src, dst),
+        }
+    }
+}
+
+impl parent::Parent for Spanning<Inst> {
+    fn children(&self) -> Vec<parent::Frag> {
+        match &self.0 {
+            Inst::AddRegOp(src, dst) => vec![
+                parent::Frag::Leaf(format!("add{} ", dst.0.size())),
+                parent::Frag::Branch(Box::new(src.clone())),
+                parent::Frag::Leaf(", ".into()),
+                parent::Frag::Branch(Box::new(dst.clone())),
+            ],
+            Inst::AddOpReg(src, dst) => vec![parent::Frag::Leaf(format!("add{}", src.0.size()))],
+            Inst::AddImmReg(src, dst) => vec![parent::Frag::Leaf(format!("add{}", dst.0.size()))],
         }
     }
 }

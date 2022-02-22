@@ -260,6 +260,7 @@ pub enum Error {
     ExpectedLongImm,
     PartialInst,
     Text(crate::text::Error),
+    UnimplOpc(Spanning<u8>),
 }
 
 impl From<crate::text::Error> for Error {
@@ -281,6 +282,7 @@ impl fmt::Display for Error {
             Error::ExpectedLongImm => write!(f, "expected long imm (4 bytes)"),
             Error::PartialInst => write!(f, "partial/incomplete instruction"),
             Error::Text(e) => write!(f, "text error: {}", e),
+            Error::UnimplOpc(c) => write!(f, "unimplemented opcode: {:x?}", c.0),
         }
     }
 }
@@ -389,7 +391,8 @@ where
                         tail.get(1..).unwrap(),
                     )
                 })?,
-            _ => unimplemented!("{:?}", code),
+            [c, ..] => return Err(Error::UnimplOpc(c.clone())),
+            [] => unreachable!(),
         };
         insts.push(inst);
     }

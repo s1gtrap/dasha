@@ -9,6 +9,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+regex = { version = "1", features = ["pattern"] }
 serde = { version = "1", optional = true }
 
 [dev-dependencies]

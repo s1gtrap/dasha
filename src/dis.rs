@@ -364,7 +364,7 @@ fn imm_reg<'a>(
     }
 }
 
-pub fn disasm<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
+pub fn disasm_bytes<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
 where
     I: IntoIterator<Item = Spanning<u8>>,
 {

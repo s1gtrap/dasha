@@ -25,7 +25,7 @@ pub trait Parent: ParentClone + fmt::Display {
     fn children(&self) -> Vec<Frag>;
 }
 
-trait ParentClone {
+pub trait ParentClone {
     fn clone_box(&self) -> Box<dyn Parent>;
 }
 

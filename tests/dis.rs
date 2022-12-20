@@ -1,10 +1,10 @@
 use dasha::{Inst, Op, Reg, Scale, Size, Spanning};
 
 #[test]
-fn test_dasha_disasm() {
+fn test_dasha_disasm_bytes() {
     // addb %al, (%eax)    [opcode + mod-reg-r/m]
     assert_eq!(
-        dasha::disasm([Spanning(0x00, 0, 1, None), Spanning(0x00, 1, 1, None)]),
+        dasha::disasm_bytes([Spanning(0x00, 0, 1, None), Spanning(0x00, 1, 1, None)]),
         Ok(vec![Spanning(
             Inst::AddRegOp(
                 Spanning(Reg::Al, 1, 1, None),
@@ -28,7 +28,7 @@ fn test_dasha_disasm() {
     );
     // addb %cl, 0x0(%ecx)    [opcode + mod-reg-r/m + disp8]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 2, None),
             Spanning(0x49, 2, 2, None),
             Spanning(0x00, 5, 2, None)
@@ -56,7 +56,7 @@ fn test_dasha_disasm() {
     );
     // addb %dl, 0x7f(%edx)    [opcode + mod-reg-r/m + disp8]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x52, 1, 1, None),
             Spanning(0x7f, 2, 1, None)
@@ -84,7 +84,7 @@ fn test_dasha_disasm() {
     );
     // addb %bl, -0x80(%ebx)    [opcode + mod-reg-r/m + disp8]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x5b, 1, 1, None),
             Spanning(0x80, 2, 1, None)
@@ -112,7 +112,7 @@ fn test_dasha_disasm() {
     );
     // addb %ah, -1(%ebx)    [opcode + mod-reg-r/m + disp8]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x63, 1, 1, None),
             Spanning(0xff, 2, 1, None),
@@ -140,7 +140,7 @@ fn test_dasha_disasm() {
     );
     // addb %ch, 0x7fffffff(%ebp)    [opcode + mod-reg-r/m + disp32]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0xad, 1, 1, None),
             Spanning(0xff, 2, 1, None),
@@ -171,7 +171,7 @@ fn test_dasha_disasm() {
     );
     // addb %al, %al    [opcode + mod-reg-r/m]
     assert_eq!(
-        dasha::disasm([Spanning(0x00, 0, 1, None), Spanning(0xc0, 1, 1, None)]),
+        dasha::disasm_bytes([Spanning(0x00, 0, 1, None), Spanning(0xc0, 1, 1, None)]),
         Ok(vec![Spanning(
             Inst::AddRegOp(
                 Spanning(Reg::Al, 1, 1, Some(0b111 << 3)),
@@ -186,7 +186,7 @@ fn test_dasha_disasm() {
     /// SIB addressing
     // addb %al, (%eax, %eax, 1)    [opcode + mod-reg-r/m + scale-index-base]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x04, 1, 1, None),
             Spanning(0x00, 2, 1, None)
@@ -214,7 +214,7 @@ fn test_dasha_disasm() {
     );
     // addb %cl, (%ecx, %ecx, 2)    [opcode + mod-reg-r/m + scale-index-base]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x0c, 1, 1, None),
             Spanning(0x49, 2, 1, None)
@@ -242,7 +242,7 @@ fn test_dasha_disasm() {
     );
     // addb %dl, (%edx, %edx, 4)    [opcode + mod-reg-r/m + scale-index-base]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x14, 1, 1, None),
             Spanning(0x92, 2, 1, None)
@@ -270,7 +270,7 @@ fn test_dasha_disasm() {
     );
     // addb %bl, (%ebx, %ebx, 8)    [opcode + mod-reg-r/m + scale-index-base]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x00, 0, 1, None),
             Spanning(0x1c, 1, 1, None),
             Spanning(0xdb, 2, 1, None)
@@ -298,7 +298,7 @@ fn test_dasha_disasm() {
     );
     // addl %eax, %eax    [opcode + mod-reg-r/m]
     assert_eq!(
-        dasha::disasm([Spanning(0x01, 0, 1, None), Spanning(0x00, 1, 1, None)]),
+        dasha::disasm_bytes([Spanning(0x01, 0, 1, None), Spanning(0x00, 1, 1, None)]),
         Ok(vec![Spanning(
             Inst::AddRegOp(
                 Spanning(Reg::Eax, 1, 1, Some(0b111 << 3)),
@@ -322,7 +322,7 @@ fn test_dasha_disasm() {
     );
     // addl %ecx, 0x0(%ecx)    [opcode + mod-reg-r/m + disp8]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x01, 0, 1, None),
             Spanning(0x49, 1, 1, None),
             Spanning(0x00, 2, 1, None),
@@ -350,7 +350,7 @@ fn test_dasha_disasm() {
     );
     // addl %edx, 0x7fffffff(%edx)    [opcode + mod-reg-r/m + disp32]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x01, 0, 1, None),
             Spanning(0x92, 1, 1, None),
             Spanning(0xff, 2, 1, None),
@@ -381,7 +381,7 @@ fn test_dasha_disasm() {
     );
     // addl %ebx, %ebx    [opcode + mod-reg-r/m]
     assert_eq!(
-        dasha::disasm([Spanning(0x01, 0, 1, None), Spanning(0xdb, 1, 1, None)]),
+        dasha::disasm_bytes([Spanning(0x01, 0, 1, None), Spanning(0xdb, 1, 1, None)]),
         Ok(vec![Spanning(
             Inst::AddRegOp(
                 Spanning(Reg::Ebx, 1, 1, Some(0b111 << 3)),
@@ -394,7 +394,7 @@ fn test_dasha_disasm() {
     );
     // addb -0x80(%esi), %al    [opcode + mod-reg-r/m + disp8]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x02, 0, 1, None),
             Spanning(0x46, 1, 1, None),
             Spanning(0x80, 2, 1, None),
@@ -422,7 +422,7 @@ fn test_dasha_disasm() {
     );
     // addl -1(%edi), %eax    [opcode + mod-reg-r/m + disp32]
     assert_eq!(
-        dasha::disasm([
+        dasha::disasm_bytes([
             Spanning(0x03, 0, 1, None),
             Spanning(0x87, 1, 1, None),
             Spanning(0xff, 2, 1, None),
@@ -453,7 +453,7 @@ fn test_dasha_disasm() {
     );
     // addb $-0x80, %al    [opcode + imm8]
     assert_eq!(
-        dasha::disasm([Spanning(0x04, 0, 1, None), Spanning(0x80, 1, 1, None),]),
+        dasha::disasm_bytes([Spanning(0x04, 0, 1, None), Spanning(0x80, 1, 1, None)]),
         Ok(vec![Spanning(
             Inst::AddImmReg(Spanning(-0x80, 1, 1, None), Spanning(Reg::Al, 0, 1, None)),
             0,

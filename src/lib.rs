@@ -2,11 +2,11 @@
 
 use std::fmt;
 
-mod dis;
+pub(crate) mod dis;
 mod parent;
 pub mod text;
 
-pub use dis::{disasm, Error};
+pub use dis::{disasm_bytes, Error};
 pub use parent::{Frag, Parent};
 
 #[derive(Clone)]
@@ -510,4 +510,8 @@ fn test_serialize() {
         .unwrap(),
         r#"{"span":[2,1],"child":["(",{"span":[2,1,7],"child":"%ebx"},",",{"span":[2,1,56],"child":"%ebx"},",",{"span":[2,1,192],"child":"1"},")"]}"#,
     );
+}
+
+pub fn disasm(code: &str) -> Result<Vec<Spanning<Inst>>, Error> {
+    dis::disasm_bytes(text::tokenize(code)?)
 }

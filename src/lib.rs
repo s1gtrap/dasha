@@ -3,57 +3,12 @@
 use std::fmt;
 
 pub(crate) mod dis;
-mod parent;
+//pub(crate) mod parent;
 pub mod text;
 
 pub use dis::{disasm_bytes, Error};
-pub use parent::{Frag, Parent};
-
-#[derive(Clone)]
-pub struct Spanning<T>(pub T, pub usize, pub usize, pub Option<u8>);
-
-impl<T> Spanning<T> {
-    fn map<U>(self, f: fn(T) -> U) -> Spanning<U> {
-        Spanning(f(self.0), self.1, self.2, self.3)
-    }
-}
-
-impl<T> PartialEq for Spanning<T>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0 && self.1 == self.1 && self.2 == other.2 && self.3 == self.3
-    }
-}
-
-impl<T> fmt::Debug for Spanning<T>
-where
-    T: fmt::Debug + Clone,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Spanning({:?}, {}, {}, {:?})",
-            self.0, self.1, self.2, self.3
-        )
-    }
-}
-
-impl<T> fmt::Display for Spanning<T>
-where
-    T: fmt::Display + Clone,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl parent::Parent for Spanning<i128> {
-    fn children(&self) -> Vec<parent::Frag> {
-        vec![parent::Frag::Leaf(format!("{}", self))]
-    }
-}
+//pub use parent::{Frag, Parent};
+pub use text::{Loc, Spanning};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Size {
@@ -91,11 +46,11 @@ impl fmt::Display for Scale {
     }
 }
 
-impl parent::Parent for Spanning<Scale> {
+/*impl parent::Parent for Spanning<Scale> {
     fn children(&self) -> Vec<parent::Frag> {
         vec![parent::Frag::Leaf(format!("{}", self))]
     }
-}
+}*/
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Scale {
@@ -149,18 +104,24 @@ impl Reg {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Op {
+pub enum Op<L>
+where
+    L: Clone,
+{
     Dir(Reg),
     Ind {
-        disp: Option<Spanning<i128>>,
-        base: Option<Spanning<Reg>>,
-        index: Option<Spanning<Reg>>,
-        scale: Option<Spanning<Scale>>,
+        disp: Option<Spanning<i128, L>>,
+        base: Option<Spanning<Reg, L>>,
+        index: Option<Spanning<Reg, L>>,
+        scale: Option<Spanning<Scale, L>>,
         size: Size,
     },
 }
 
-impl Op {
+impl<L> Op<L>
+where
+    L: Clone,
+{
     pub fn size(&self) -> Size {
         match self {
             Op::Dir(reg) => reg.size(),
@@ -192,7 +153,10 @@ impl fmt::Display for Reg {
     }
 }
 
-impl fmt::Display for Op {
+impl<L> fmt::Display for Op<L>
+where
+    L: Clone + fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Op::Dir(reg) => write!(f, "{}", reg),
@@ -236,7 +200,10 @@ impl fmt::Display for Op {
     }
 }
 
-impl parent::Parent for Spanning<Op> {
+/*impl<L> parent::Parent for Spanning<Op<L>>
+where
+    L: Clone + fmt::Debug,
+{
     fn children(&self) -> Vec<parent::Frag> {
         match &self.0 {
             Op::Dir(reg) => vec![parent::Frag::Leaf(format!("{}", reg))],
@@ -299,22 +266,31 @@ impl parent::Parent for Spanning<Op> {
             op => unimplemented!("{:?}", op),
         }
     }
-}
+}*/
 
-impl parent::Parent for Spanning<Reg> {
+/*impl<L> parent::Parent for Spanning<Reg, L>
+where
+    L: Clone,
+{
     fn children(&self) -> Vec<parent::Frag> {
         vec![parent::Frag::Leaf(format!("{}", self))]
     }
-}
+}*/
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Inst {
-    AddRegOp(Spanning<Reg>, Spanning<Op>),
-    AddOpReg(Spanning<Op>, Spanning<Reg>),
-    AddImmReg(Spanning<i128>, Spanning<Reg>),
+pub enum Inst<L>
+where
+    L: fmt::Debug + Clone,
+{
+    AddRegOp(Spanning<Reg, L>, Spanning<Op<L>, L>),
+    AddOpReg(Spanning<Op<L>, L>, Spanning<Reg, L>),
+    AddImmReg(Spanning<i128, L>, Spanning<Reg, L>),
 }
 
-impl Inst {
+impl<L> Inst<L>
+where
+    L: fmt::Debug + Clone,
+{
     pub fn size(&self) -> Size {
         match self {
             Inst::AddRegOp(_, ref op) | Inst::AddOpReg(ref op, _) => op.0.size(),
@@ -323,7 +299,10 @@ impl Inst {
     }
 }
 
-impl fmt::Display for Inst {
+impl<L> fmt::Display for Inst<L>
+where
+    L: fmt::Debug + Clone,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Inst::AddRegOp(src, dst) => write!(f, "add{} {}, {}", dst.0.size(), src, dst),
@@ -333,7 +312,10 @@ impl fmt::Display for Inst {
     }
 }
 
-impl parent::Parent for Spanning<Inst> {
+/*impl<L> parent::Parent for Spanning<Inst<L>>
+where
+    L: Clone + fmt::Debug,
+{
     fn children(&self) -> Vec<parent::Frag> {
         match &self.0 {
             Inst::AddRegOp(src, dst) => vec![
@@ -346,7 +328,7 @@ impl parent::Parent for Spanning<Inst> {
             Inst::AddImmReg(src, dst) => vec![parent::Frag::Leaf(format!("add{}", dst.0.size()))],
         }
     }
-}
+}*/
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Reg {
@@ -512,6 +494,6 @@ fn test_serialize() {
     );
 }
 
-pub fn disasm(code: &str) -> Result<Vec<Spanning<Inst>>, Error> {
+pub fn disasm(code: &str) -> Result<Vec<Spanning<Inst<Loc>, Loc>>, Error<Loc>> {
     dis::disasm_bytes(text::tokenize(code)?)
 }

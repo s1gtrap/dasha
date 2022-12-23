@@ -1,6 +1,6 @@
 use std::{error, fmt};
 
-use super::{Inst, Op, Reg, Scale, Size, Spanning};
+use crate::{Inst, Loc, Op, Reg, Scale, Size, Spanning};
 
 // addr mode
 enum Mode {
@@ -14,17 +14,23 @@ enum Mode {
     Direct,
 }
 
-trait ByteExt {
+trait ByteExt<L>
+where
+    L: Clone,
+{
     fn mode(self) -> Mode;
-    fn reg(self, size: Size) -> Spanning<Reg>;
-    fn rm(self, size: Size) -> Spanning<Reg>;
+    fn reg(self, size: Size) -> Spanning<Reg, L>;
+    fn rm(self, size: Size) -> Spanning<Reg, L>;
 
-    fn scale(self) -> Spanning<Scale>;
-    fn index(self, size: Size) -> Spanning<Reg>;
-    fn base(self, size: Size) -> Spanning<Reg>;
+    fn scale(self) -> Spanning<Scale, L>;
+    fn index(self, size: Size) -> Spanning<Reg, L>;
+    fn base(self, size: Size) -> Spanning<Reg, L>;
 }
 
-impl<'a> ByteExt for &'a Spanning<u8> {
+impl<'a, L> ByteExt<L> for &'a Spanning<u8, L>
+where
+    L: Clone,
+{
     fn mode(self) -> Mode {
         match self.0 >> 6 {
             0b00 => Mode::Indirect,
@@ -35,7 +41,7 @@ impl<'a> ByteExt for &'a Spanning<u8> {
         }
     }
 
-    fn reg(self, size: Size) -> Spanning<Reg> {
+    fn reg(self, size: Size) -> Spanning<Reg, L> {
         Spanning(
             match (self.0 >> 3 & 0b111, size) {
                 (0b000, Size::Byte) => Reg::Al,
@@ -56,13 +62,13 @@ impl<'a> ByteExt for &'a Spanning<u8> {
                 (0b111, Size::Long) => Reg::Edi,
                 _ => unreachable!(),
             },
-            self.1,
-            self.2,
+            self.1.clone(),
+            self.2.clone(),
             Some(0b111 << 3),
         )
     }
 
-    fn rm(self, size: Size) -> Spanning<Reg> {
+    fn rm(self, size: Size) -> Spanning<Reg, L> {
         Spanning(
             match (self.0 & 0b111, size) {
                 (0b000, Size::Byte) => Reg::Al,
@@ -83,13 +89,13 @@ impl<'a> ByteExt for &'a Spanning<u8> {
                 (0b111, Size::Long) => Reg::Edi,
                 _ => unreachable!(),
             },
-            self.1,
-            self.2,
+            self.1.clone(),
+            self.2.clone(),
             Some(0b111),
         )
     }
 
-    fn scale(self) -> Spanning<Scale> {
+    fn scale(self) -> Spanning<Scale, L> {
         Spanning(
             match self.0 >> 6 {
                 0b00 => Scale::One,
@@ -98,34 +104,41 @@ impl<'a> ByteExt for &'a Spanning<u8> {
                 0b11 => Scale::Eight,
                 _ => unreachable!(),
             },
-            self.1,
-            self.2,
+            self.1.clone(),
+            self.2.clone(),
             Some(0b11 << 6),
         )
     }
 
-    fn index(self, size: Size) -> Spanning<Reg> {
+    fn index(self, size: Size) -> Spanning<Reg, L> {
         self.reg(size)
     }
 
-    fn base(self, size: Size) -> Spanning<Reg> {
+    fn base(self, size: Size) -> Spanning<Reg, L> {
         self.rm(size)
     }
 }
 
-trait ByteSliceExt<'a> {
+trait ByteSliceExt<'a, L>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     fn mode(self) -> Option<Mode>;
-    fn reg(self, size: Size) -> Result<Spanning<Reg>, Error>;
-    fn rm(self, size: Size) -> Result<Spanning<Op>, Error>;
-    fn inst_len(self) -> Result<usize, Error>;
-    fn inst_split(self) -> Result<Option<(&'a [Spanning<u8>], &'a [Spanning<u8>])>, Error>;
+    fn reg(self, size: Size) -> Result<Spanning<Reg, L>, Error<L>>;
+    fn rm(self, size: Size) -> Result<Spanning<Op<L>, L>, Error<L>>;
+    fn inst_len(self) -> Result<usize, Error<L>>;
+    fn inst_split(self)
+        -> Result<Option<(&'a [Spanning<u8, L>], &'a [Spanning<u8, L>])>, Error<L>>;
 
     fn prim<I>(self) -> Option<I>
     where
-        I: Fixed;
+        I: Fixed<L>;
 }
 
-impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
+impl<'a, L> ByteSliceExt<'a, L> for &'a [Spanning<u8, L>]
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     fn mode(self) -> Option<Mode> {
         self.get(0).map(|mrr| match mrr.0 >> 6 {
             0b00 => Mode::Indirect,
@@ -136,13 +149,13 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
         })
     }
 
-    fn reg(self, size: Size) -> Result<Spanning<Reg>, Error> {
+    fn reg(self, size: Size) -> Result<Spanning<Reg, L>, Error<L>> {
         self.get(0)
             .map(|mrr| mrr.reg(size))
             .ok_or(Error::ExpectedMrr)
     }
 
-    fn rm(self, size: Size) -> Result<Spanning<Op>, Error> {
+    fn rm(self, size: Size) -> Result<Spanning<Op<L>, L>, Error<L>> {
         self.get(0)
             .ok_or(Error::ExpectedMrr)
             .and_then(|mrr| -> Result<_, _> {
@@ -167,7 +180,7 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                         Mode::ByteDisp => Op::Ind {
                             disp: Some({
                                 let disp = self.get(1).ok_or(Error::ExpectedByteDisp)?;
-                                Spanning(disp.0 as i8 as _, disp.1, disp.2, None)
+                                Spanning(disp.0 as i8 as _, disp.1.clone(), disp.2.clone(), None)
                             }),
                             base: Some(mrr.rm(Size::Long)),
                             index: None,
@@ -186,8 +199,8 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                                 long.copy_from_slice(&disp);
                                 Spanning(
                                     i32::from_le_bytes(long) as _,
-                                    self[1].1,
-                                    self[4].1 - self[1].1 + self[4].2,
+                                    self[1].1.clone(),
+                                    self[4].2.clone(),
                                     None,
                                 )
                             }),
@@ -198,14 +211,17 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
                         },
                         Mode::Direct => Op::Dir(mrr.rm(size).0),
                     },
-                    mrr.1,
-                    mrr.2,
-                    Some(0b111),
+                    mrr.1.clone(),
+                    mrr.2.clone(),
+                    match mrr.mode() {
+                        Mode::Direct => Some(0b111),
+                        Mode::Indirect | Mode::ByteDisp | Mode::LongDisp => None,
+                    },
                 ))
             })
     }
 
-    fn inst_len(self) -> Result<usize, Error> {
+    fn inst_len(self) -> Result<usize, Error<L>> {
         let mrr = self.get(0).ok_or(Error::ExpectedMrr)?;
         match mrr.mode() {
             Mode::Indirect if mrr.rm(Size::Long).0 == Reg::Esp => Ok(2),
@@ -219,31 +235,42 @@ impl<'a> ByteSliceExt<'a> for &'a [Spanning<u8>] {
         }
     }
 
-    fn inst_split(self) -> Result<Option<(&'a [Spanning<u8>], &'a [Spanning<u8>])>, Error> {
+    fn inst_split(
+        self,
+    ) -> Result<Option<(&'a [Spanning<u8, L>], &'a [Spanning<u8, L>])>, Error<L>> {
         let len = self.inst_len()?;
         Ok(self.get(..len).map(|head| (head, self.get(len..).unwrap())))
     }
 
     fn prim<I>(self) -> Option<I>
     where
-        I: Fixed,
+        I: Fixed<L>,
     {
         I::from_slice(self)
     }
 }
 
-trait Fixed: Sized {
-    fn from_slice(s: &[Spanning<u8>]) -> Option<Self>;
+trait Fixed<L>: Sized
+where
+    L: Clone,
+{
+    fn from_slice(s: &[Spanning<u8, L>]) -> Option<Self>;
 }
 
-impl Fixed for Spanning<u8> {
-    fn from_slice(s: &[Spanning<u8>]) -> Option<Self> {
+impl<L> Fixed<L> for Spanning<u8, L>
+where
+    L: Clone,
+{
+    fn from_slice(s: &[Spanning<u8, L>]) -> Option<Self> {
         s.get(0).cloned()
     }
 }
 
-impl Fixed for Spanning<i8> {
-    fn from_slice(s: &[Spanning<u8>]) -> Option<Self> {
+impl<L> Fixed<L> for Spanning<i8, L>
+where
+    L: Clone,
+{
+    fn from_slice(s: &[Spanning<u8, L>]) -> Option<Self> {
         s.get(0)
             .cloned()
             .map(|Spanning(a, b, c, d)| Spanning(a as _, b, c, d))
@@ -251,7 +278,10 @@ impl Fixed for Spanning<i8> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Error {
+pub enum Error<L>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     ExpectedMrr,
     ExpectedSib,
     ExpectedByteDisp,
@@ -260,18 +290,24 @@ pub enum Error {
     ExpectedLongImm,
     PartialInst,
     Text(crate::text::Error),
-    UnimplOpc(Spanning<u8>),
+    UnimplOpc(Spanning<u8, L>),
 }
 
-impl From<crate::text::Error> for Error {
+impl<L> From<crate::text::Error> for Error<L>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     fn from(other: crate::text::Error) -> Self {
         Error::Text(other)
     }
 }
 
-impl error::Error for Error {}
+impl<L> error::Error for Error<L> where L: fmt::Debug + Clone + PartialEq {}
 
-impl fmt::Display for Error {
+impl<L> fmt::Display for Error<L>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::ExpectedMrr => write!(f, "expected mod-reg-r/m byte"),
@@ -287,22 +323,25 @@ impl fmt::Display for Error {
     }
 }
 
-fn reg_op<'a>(
-    f: &dyn Fn(Spanning<Reg>, Spanning<Op>) -> Inst,
-    s: &'a [Spanning<u8>],
+fn reg_op<'a, L>(
+    f: &dyn Fn(Spanning<Reg, L>, Spanning<Op<L>, L>) -> Inst<L>,
+    s: &'a [Spanning<u8, L>],
     sz: Size,
-) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
+) -> Result<(Spanning<Inst<L>, L>, &'a [Spanning<u8, L>]), Error<L>>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     match s {
-        &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
+        &[Spanning(_, ref oss, ref osl, _), ref tail @ ..] => Ok((
             Spanning(
                 f(tail.reg(sz)?, tail.rm(sz)?),
-                oss,
+                oss.clone(),
                 tail.inst_split()?
                     .ok_or(Error::PartialInst)?
                     .0
                     .last()
-                    .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
-                    .unwrap_or(osl),
+                    .map(|Spanning(_, _, sl, _)| sl.clone())
+                    .unwrap(),
                 None,
             ),
             tail.inst_split()?.ok_or(Error::PartialInst)?.1,
@@ -311,22 +350,25 @@ fn reg_op<'a>(
     }
 }
 
-fn op_reg<'a>(
-    f: &dyn Fn(Spanning<Op>, Spanning<Reg>) -> Inst,
-    s: &'a [Spanning<u8>],
+fn op_reg<'a, L>(
+    f: &dyn Fn(Spanning<Op<L>, L>, Spanning<Reg, L>) -> Inst<L>,
+    s: &'a [Spanning<u8, L>],
     sz: Size,
-) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
+) -> Result<(Spanning<Inst<L>, L>, &'a [Spanning<u8, L>]), Error<L>>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     match s {
-        &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
+        &[Spanning(_, ref oss, ref osl, _), ref tail @ ..] => Ok((
             Spanning(
                 f(tail.rm(sz)?, tail.reg(sz)?),
-                oss,
+                oss.clone(),
                 tail.inst_split()?
                     .ok_or(Error::PartialInst)?
                     .0
                     .last()
-                    .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
-                    .unwrap_or(osl),
+                    .map(|Spanning(_, _, sl, _)| sl.clone())
+                    .unwrap_or(osl.clone()),
                 None,
             ),
             tail.inst_split()?.ok_or(Error::PartialInst)?.1,
@@ -335,27 +377,30 @@ fn op_reg<'a>(
     }
 }
 
-fn imm_reg<'a>(
-    f: &dyn Fn(Spanning<i128>, Spanning<Reg>) -> Inst,
-    s: &'a [Spanning<u8>],
+fn imm_reg<'a, L>(
+    f: &dyn Fn(Spanning<i128, L>, Spanning<Reg, L>) -> Inst<L>,
+    s: &'a [Spanning<u8, L>],
     sz: Size,
-) -> Result<(Spanning<Inst>, &'a [Spanning<u8>]), Error> {
+) -> Result<(Spanning<Inst<L>, L>, &'a [Spanning<u8, L>]), Error<L>>
+where
+    L: fmt::Debug + Clone + PartialEq,
+{
     match s {
-        &[Spanning(_, oss, osl, _), ref tail @ ..] => Ok((
+        &[Spanning(_, ref oss, ref osl, _), ref tail @ ..] => Ok((
             Spanning(
                 f(
                     tail.get(0)
-                        .map(|&Spanning(i, s, l, b)| Spanning(i as _, s, l, b))
+                        .map(|Spanning(i, s, l, b)| Spanning(*i as _, s.clone(), l.clone(), *b))
                         .ok_or(Error::ExpectedByteImm)?,
                     tail.reg(sz)?,
                 ),
-                oss,
+                oss.clone(),
                 tail.inst_split()?
                     .ok_or(Error::PartialInst)?
                     .0
                     .last()
-                    .map(|Spanning(_, ss, sl, _)| ss + sl - oss)
-                    .unwrap_or(osl),
+                    .map(|Spanning(_, _, sl, _)| sl.clone())
+                    .unwrap_or(osl.clone()),
                 None,
             ),
             tail.inst_split()?.ok_or(Error::PartialInst)?.1,
@@ -364,9 +409,10 @@ fn imm_reg<'a>(
     }
 }
 
-pub fn disasm_bytes<I>(i: I) -> Result<Vec<Spanning<Inst>>, Error>
+pub fn disasm_bytes<I, L>(i: I) -> Result<Vec<Spanning<Inst<L>, L>>, Error<L>>
 where
-    I: IntoIterator<Item = Spanning<u8>>,
+    I: IntoIterator<Item = Spanning<u8, L>>,
+    L: fmt::Debug + Clone + PartialEq,
 {
     let mut code = &i.into_iter().collect::<Vec<_>>()[..];
     let mut insts = vec![];
@@ -378,14 +424,17 @@ where
             [Spanning(0x02, _, _, _), ..] => op_reg(&Inst::AddOpReg, code, Size::Byte)?,
             [Spanning(0x03, _, _, _), ..] => op_reg(&Inst::AddOpReg, code, Size::Long)?,
             [Spanning(0x04, s, l, _), ref tail @ ..] => tail
-                .prim::<Spanning<i8>>()
+                .prim::<Spanning<i8, L>>()
                 .ok_or(Error::ExpectedByteImm)
-                .map(|s @ Spanning(_, ss, sl, _)| -> (_, _) {
+                .map(|ref p @ Spanning(_, ref ss, ref sl, _)| -> (_, _) {
                     (
                         Spanning(
-                            Inst::AddImmReg(s.map(|i| i as _), Spanning(Reg::Al, ss, sl, None)),
-                            ss,
-                            2,
+                            Inst::AddImmReg(
+                                p.clone().map(|i| i as _),
+                                Spanning(Reg::Al, s.clone(), l.clone(), None),
+                            ),
+                            s.clone(),
+                            sl.clone(),
                             None,
                         ),
                         tail.get(1..).unwrap(),
@@ -423,38 +472,38 @@ fn test_byte_slice_ext_inst_len() {
 
 #[test]
 fn test_byte_slice_ext_prim() {
-    assert_eq!([].as_ref().prim::<Spanning<u8>>(), None);
+    assert_eq!([].prim::<Spanning<u8, Loc>>(), None);
     assert_eq!(
-        [Spanning(0x00, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
-        Some(Spanning(0x00, 0, 1, None)),
+        [Spanning(0x00, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0x00, Loc(1, 1), Loc(1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x7f, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
-        Some(Spanning(0x7f, 0, 1, None)),
+        [Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x80, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
-        Some(Spanning(0x80, 0, 1, None)),
+        [Spanning(0x80, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0x80, Loc(1, 1), Loc(1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0xff, 0, 1, None)].as_ref().prim::<Spanning<u8>>(),
-        Some(Spanning(0xff, 0, 1, None)),
+        [Spanning(0xff, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0xff, Loc(1, 1), Loc(1, 2), None)),
     );
-    assert_eq!([].as_ref().prim::<Spanning<i8>>(), None);
+    assert_eq!([].as_ref().prim::<Spanning<i8, Loc>>(), None);
     assert_eq!(
-        [Spanning(0x00, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
-        Some(Spanning(0x00, 0, 1, None)),
-    );
-    assert_eq!(
-        [Spanning(0x7f, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
-        Some(Spanning(0x7f, 0, 1, None)),
+        [Spanning(0x00, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(0x00, Loc(1, 1), Loc(1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x80, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
-        Some(Spanning(-0x80, 0, 1, None)),
+        [Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0xff, 0, 1, None)].as_ref().prim::<Spanning<i8>>(),
-        Some(Spanning(-0x1, 0, 1, None)),
+        [Spanning(0x80, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(-0x80, Loc(1, 1), Loc(1, 2), None)),
+    );
+    assert_eq!(
+        [Spanning(0xff, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(-0x1, Loc(1, 1), Loc(1, 2), None)),
     );
 }

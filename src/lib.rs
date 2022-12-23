@@ -1,5 +1,3 @@
-#![feature(destructuring_assignment)]
-
 use std::fmt;
 
 pub(crate) mod dis;

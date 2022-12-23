@@ -1,6 +1,6 @@
 use std::{error, fmt};
 
-use crate::{Inst, Loc, Op, Reg, Scale, Size, Spanning};
+use crate::{Inst, Op, Reg, Scale, Size, Spanning};
 
 // addr mode
 enum Mode {
@@ -332,7 +332,7 @@ where
     L: fmt::Debug + Clone + PartialEq,
 {
     match s {
-        &[Spanning(_, ref oss, ref osl, _), ref tail @ ..] => Ok((
+        &[Spanning(_, ref oss, _, _), ref tail @ ..] => Ok((
             Spanning(
                 f(tail.reg(sz)?, tail.rm(sz)?),
                 oss.clone(),
@@ -426,7 +426,7 @@ where
             [Spanning(0x04, s, l, _), ref tail @ ..] => tail
                 .prim::<Spanning<i8, L>>()
                 .ok_or(Error::ExpectedByteImm)
-                .map(|ref p @ Spanning(_, ref ss, ref sl, _)| -> (_, _) {
+                .map(|ref p @ Spanning(_, _, ref sl, _)| {
                     (
                         Spanning(
                             Inst::AddImmReg(
@@ -472,38 +472,39 @@ fn test_byte_slice_ext_inst_len() {
 
 #[test]
 fn test_byte_slice_ext_prim() {
+    use crate::Loc;
     assert_eq!([].prim::<Spanning<u8, Loc>>(), None);
     assert_eq!(
-        [Spanning(0x00, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
-        Some(Spanning(0x00, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0x00, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0x00, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
-        Some(Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0x7f, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0x7f, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x80, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
-        Some(Spanning(0x80, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0x80, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0x80, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0xff, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<u8, _>>(),
-        Some(Spanning(0xff, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0xff, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<u8, _>>(),
+        Some(Spanning(0xff, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!([].as_ref().prim::<Spanning<i8, Loc>>(), None);
     assert_eq!(
-        [Spanning(0x00, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
-        Some(Spanning(0x00, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0x00, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(0x00, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
-        Some(Spanning(0x7f, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0x7f, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(0x7f, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0x80, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
-        Some(Spanning(-0x80, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0x80, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(-0x80, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
     assert_eq!(
-        [Spanning(0xff, Loc(1, 1), Loc(1, 2), None)].prim::<Spanning<i8, _>>(),
-        Some(Spanning(-0x1, Loc(1, 1), Loc(1, 2), None)),
+        [Spanning(0xff, Loc(0, 1, 1), Loc(1, 1, 2), None)].prim::<Spanning<i8, _>>(),
+        Some(Spanning(-0x1, Loc(0, 1, 1), Loc(1, 1, 2), None)),
     );
 }

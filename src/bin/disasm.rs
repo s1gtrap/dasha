@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let text = std::str::from_utf8(&buf).unwrap(); // what about unicode?
 
         for c in dasha::disasm(text)? {
-            println!("{}:\t{}", c.1, c);
+            println!("{}:\t{}", &text[c.1 .0..c.2 .0], c);
         }
     } else {
         // binary
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .enumerate()
                 .map(|(idx, byte)| Spanning(byte.unwrap(), idx, 1, None)),
         )? {
-            println!("{:#x}:\t{:?}", c.1, c);
+            println!("{:#x}:\t{}", c.1, c);
         }
     }
     Ok(())

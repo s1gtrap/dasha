@@ -1,6 +1,6 @@
 use dasha::{Inst, Loc, Op, Reg, Scale, Size, Spanning};
 
-use pretty_assertions::{assert_eq, assert_ne};
+use pretty_assertions::assert_eq;
 
 #[test]
 fn test_dasha_disasm_bytes() {
@@ -456,16 +456,16 @@ fn test_dasha_disasm_bytes() {
     // addb $-0x80, %al    [opcode + imm8]
     assert_eq!(
         dasha::disasm_bytes([
-            Spanning(0x04, Loc(1, 1), Loc(1, 3), None),
-            Spanning(0x80, Loc(1, 3), Loc(1, 5), None),
+            Spanning(0x04, Loc(0, 1, 1), Loc(2, 1, 3), None),
+            Spanning(0x80, Loc(2, 1, 3), Loc(4, 1, 5), None),
         ]),
         Ok(vec![Spanning(
             Inst::AddImmReg(
-                Spanning(-0x80, Loc(1, 3), Loc(1, 5), None),
-                Spanning(Reg::Al, Loc(1, 1), Loc(1, 3), None),
+                Spanning(-0x80, Loc(2, 1, 3), Loc(4, 1, 5), None),
+                Spanning(Reg::Al, Loc(0, 1, 1), Loc(2, 1, 3), None),
             ),
-            Loc(1, 1),
-            Loc(1, 5),
+            Loc(0, 1, 1),
+            Loc(4, 1, 5),
             None,
         )]),
     );

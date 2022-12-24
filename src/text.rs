@@ -84,12 +84,6 @@ where
     }
 }
 
-/*impl Parent for Spanning<i128> {
-    fn children(&self) -> Vec<Frag> {
-        vec![Frag::Leaf(format!("{}", self))]
-    }
-}*/
-
 #[derive(Debug, PartialEq)]
 pub struct Tokenizer<'a> {
     offset: Loc,

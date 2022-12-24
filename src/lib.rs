@@ -1,11 +1,10 @@
 use std::fmt;
 
 pub(crate) mod dis;
-//pub(crate) mod parent;
+pub(crate) mod display;
 pub mod text;
 
 pub use dis::{disasm_bytes, Error};
-//pub use parent::{Frag, Parent};
 pub use text::{Loc, Spanning};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -43,12 +42,6 @@ impl fmt::Display for Scale {
         }
     }
 }
-
-/*impl parent::Parent for Spanning<Scale> {
-    fn children(&self) -> Vec<parent::Frag> {
-        vec![parent::Frag::Leaf(format!("{}", self))]
-    }
-}*/
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Scale {
@@ -198,83 +191,6 @@ where
     }
 }
 
-/*impl<L> parent::Parent for Spanning<Op<L>>
-where
-    L: Clone + fmt::Debug,
-{
-    fn children(&self) -> Vec<parent::Frag> {
-        match &self.0 {
-            Op::Dir(reg) => vec![parent::Frag::Leaf(format!("{}", reg))],
-            Op::Ind {
-                disp: None,
-                base: None,
-                index: None,
-                scale: None,
-                ..
-            } => unreachable!(),
-            Op::Ind {
-                disp: None,
-                base: Some(base),
-                index: None,
-                scale: None,
-                ..
-            } => vec![
-                parent::Frag::Leaf("(".into()),
-                parent::Frag::Branch(Box::new(base.clone())),
-                parent::Frag::Leaf(")".into()),
-            ],
-            Op::Ind {
-                disp: Some(disp),
-                base: Some(base),
-                index: None,
-                scale: None,
-                ..
-            } => vec![
-                parent::Frag::Branch(Box::new(disp.clone())),
-                parent::Frag::Leaf("(".into()),
-                parent::Frag::Branch(Box::new(base.clone())),
-                parent::Frag::Leaf(")".into()),
-            ],
-            Op::Ind {
-                disp: None,
-                base: Some(base),
-                index: Some(index),
-                scale: Some(scale),
-                ..
-            } => vec![
-                parent::Frag::Leaf("(".into()),
-                parent::Frag::Branch(Box::new(base.clone())),
-                parent::Frag::Leaf(", ".into()),
-                parent::Frag::Branch(Box::new(index.clone())),
-                parent::Frag::Leaf(", ".into()),
-                parent::Frag::Branch(Box::new(scale.clone())),
-                parent::Frag::Leaf(")".into()),
-            ],
-            Op::Ind {
-                disp: Some(Spanning(disp, _, _, _)),
-                base: Some(Spanning(base, _, _, _)),
-                index: Some(Spanning(index, _, _, _)),
-                scale: Some(Spanning(scale, _, _, _)),
-                ..
-            } => vec![
-                parent::Frag::Leaf("(".into()),
-                parent::Frag::Leaf(format!("{}", base)),
-                parent::Frag::Leaf("(".into()),
-            ],
-            op => unimplemented!("{:?}", op),
-        }
-    }
-}*/
-
-/*impl<L> parent::Parent for Spanning<Reg, L>
-where
-    L: Clone,
-{
-    fn children(&self) -> Vec<parent::Frag> {
-        vec![parent::Frag::Leaf(format!("{}", self))]
-    }
-}*/
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Inst<L>
 where
@@ -308,188 +224,6 @@ where
             Inst::AddImmReg(src, dst) => write!(f, "add{} {}, {}", dst.0.size(), src, dst),
         }
     }
-}
-
-/*impl<L> parent::Parent for Spanning<Inst<L>>
-where
-    L: Clone + fmt::Debug,
-{
-    fn children(&self) -> Vec<parent::Frag> {
-        match &self.0 {
-            Inst::AddRegOp(src, dst) => vec![
-                parent::Frag::Leaf(format!("add{} ", dst.0.size())),
-                parent::Frag::Branch(Box::new(src.clone())),
-                parent::Frag::Leaf(", ".into()),
-                parent::Frag::Branch(Box::new(dst.clone())),
-            ],
-            Inst::AddOpReg(src, dst) => vec![parent::Frag::Leaf(format!("add{}", src.0.size()))],
-            Inst::AddImmReg(src, dst) => vec![parent::Frag::Leaf(format!("add{}", dst.0.size()))],
-        }
-    }
-}*/
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for Reg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&format!("{}", self))
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for Op {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeTuple;
-        match self {
-            Op::Dir(reg) => reg.serialize(serializer),
-            Op::Ind {
-                disp: None,
-                base: None,
-                index: None,
-                scale: None,
-                ..
-            } => unreachable!(),
-            Op::Ind {
-                disp: Some(disp),
-                base: Some(base),
-                index: None,
-                scale: None,
-                ..
-            } => {
-                let mut tup = serializer.serialize_tuple(4)?;
-                tup.serialize_element(disp)?;
-                tup.serialize_element("(")?;
-                tup.serialize_element(base)?;
-                tup.serialize_element(")")?;
-                tup.end()
-            }
-            Op::Ind {
-                disp: None,
-                base: Some(base),
-                index: None,
-                scale: None,
-                ..
-            } => {
-                let mut tup = serializer.serialize_tuple(3)?;
-                tup.serialize_element("(")?;
-                tup.serialize_element(base)?;
-                tup.serialize_element(")")?;
-                tup.end()
-            }
-            Op::Ind {
-                disp: None,
-                base: Some(base),
-                index: Some(index),
-                scale: Some(scale),
-                ..
-            } => {
-                let mut tup = serializer.serialize_tuple(3)?;
-                tup.serialize_element("(")?;
-                tup.serialize_element(base)?;
-                tup.serialize_element(",")?;
-                tup.serialize_element(index)?;
-                tup.serialize_element(",")?;
-                tup.serialize_element(scale)?;
-                tup.serialize_element(")")?;
-                tup.end()
-            }
-            _ => unimplemented!(),
-        }
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for Inst {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeTuple;
-        match self {
-            Inst::AddRegOp(reg, op) => {
-                let mut tup = serializer.serialize_tuple(4)?;
-                tup.serialize_element("add ")?;
-                tup.serialize_element(reg)?;
-                tup.serialize_element(", ")?;
-                tup.serialize_element(op)?;
-                tup.end()
-            }
-            _ => unimplemented!(),
-        }
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<T> serde::Serialize for Spanning<T>
-where
-    T: serde::Serialize + Clone,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut st = serializer.serialize_struct("", 2)?;
-        st.serialize_field(
-            "span",
-            &[self.1, self.2]
-                .iter()
-                .chain(&self.3.map(|mask| mask as _))
-                .collect::<Vec<_>>(),
-        )?;
-        st.serialize_field("child", &self.0)?;
-        st.end()
-    }
-}
-
-#[test]
-#[cfg(feature = "serde")]
-fn test_serialize() {
-    assert_eq!(
-        &serde_json::to_string(&Spanning(Reg::Eax, 1, 1, Some(0b00111000))).unwrap(),
-        r#"{"span":[1,1,56],"child":"%eax"}"#,
-    );
-    assert_eq!(
-        &serde_json::to_string(&Spanning(Op::Dir(Reg::Ecx), 1, 1, Some(0b00000111))).unwrap(),
-        r#"{"span":[1,1,7],"child":"%ecx"}"#,
-    );
-    assert_eq!(
-        &serde_json::to_string(&Spanning(
-            Op::Ind {
-                disp: None,
-                base: Some(Spanning(Reg::Edx, 1, 1, Some(0b00000111))),
-                index: None,
-                scale: None,
-                size: Size::Byte,
-            },
-            1,
-            1,
-            None,
-        ))
-        .unwrap(),
-        r#"{"span":[1,1],"child":["(",{"span":[1,1,7],"child":"%edx"},")"]}"#,
-    );
-    assert_eq!(
-        &serde_json::to_string(&Spanning(
-            Op::Ind {
-                disp: None,
-                base: Some(Spanning(Reg::Ebx, 2, 1, Some(0b111))),
-                index: Some(Spanning(Reg::Ebx, 2, 1, Some(0b111 << 3))),
-                scale: Some(Spanning(Scale::One, 2, 1, Some(0b11 << 6))),
-                size: Size::Byte,
-            },
-            2,
-            1,
-            None,
-        ))
-        .unwrap(),
-        r#"{"span":[2,1],"child":["(",{"span":[2,1,7],"child":"%ebx"},",",{"span":[2,1,56],"child":"%ebx"},",",{"span":[2,1,192],"child":"1"},")"]}"#,
-    );
 }
 
 pub fn disasm(code: &str) -> Result<Vec<Spanning<Inst<Loc>, Loc>>, Error<Loc>> {

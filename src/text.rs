@@ -97,6 +97,12 @@ pub struct Tokenizer<'a> {
 }
 
 impl<'a> Tokenizer<'a> {
+    fn new(text: &'a str) -> Self {
+        Tokenizer {
+            offset: Default::default(),
+            text,
+        }
+    }
     fn trim_start(&mut self) {
         loop {
             match self.text.chars().next() {
@@ -167,74 +173,47 @@ impl<'a> Tokenizer<'a> {
 
 #[test]
 fn test_tokenizer_trim_start() {
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "",
-    };
+    let mut t = Tokenizer::new("");
     t.trim_start();
     assert_eq!(t.offset, Loc::default());
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "  ",
-    };
+    let mut t = Tokenizer::new("  ");
     t.trim_start();
     assert_eq!(t.offset, Loc(2, 0, 2));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "\t\r\n",
-    };
+    let mut t = Tokenizer::new("\t\r\n");
     t.trim_start();
     assert_eq!(t.offset, Loc(2, 1, 0));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: " ;  ",
-    };
+    let mut t = Tokenizer::new(" ;  ");
     t.trim_start();
     assert_eq!(t.offset, Loc(4, 0, 4));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: " ; hello world ",
-    };
+    let mut t = Tokenizer::new(" ; hello world ");
     t.trim_start();
     assert_eq!(t.offset, Loc(15, 0, 15));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "1312 ; baca ",
-    };
+    let mut t = Tokenizer::new("1312 ; baca ");
     t.trim_start();
     assert_eq!(t.offset, Loc::default());
     assert_eq!(t.text, "1312 ; baca ");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "\t\t  4200\n\t\t  1337",
-    };
+    let mut t = Tokenizer::new("\t\t  4200\n\t\t  1337");
     t.trim_start();
     assert_eq!(t.offset, Loc(4, 0, 4));
     assert_eq!(t.text, "4200\n\t\t  1337");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "    f4c3 ; book\n    c00b ; ecaf\n",
-    };
+    let mut t = Tokenizer::new("    f4c3 ; book\n    c00b ; ecaf\n");
     t.trim_start();
     assert_eq!(t.offset, Loc(4, 0, 4));
     assert_eq!(t.text, "f4c3 ; book\n    c00b ; ecaf\n");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "; lorem ipsum\n; dolor sit amet\nffff",
-    };
+    let mut t = Tokenizer::new("; lorem ipsum\n; dolor sit amet\nffff");
     t.trim_start();
     assert_eq!(t.offset, Loc(31, 2, 0));
     assert_eq!(t.text, "ffff");
@@ -242,50 +221,32 @@ fn test_tokenizer_trim_start() {
 
 #[test]
 fn test_tokenizer_take_byte() {
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "",
-    };
+    let mut t = Tokenizer::new("");
     assert_eq!(t.take_byte(), None);
     assert_eq!(t.offset, Loc::default());
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "  ",
-    };
+    let mut t = Tokenizer::new("  ");
     assert_eq!(t.take_byte(), None);
     assert_eq!(t.offset, Loc(2, 0, 2));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "\t\r\n",
-    };
+    let mut t = Tokenizer::new("\t\r\n");
     assert_eq!(t.take_byte(), None);
     assert_eq!(t.offset, Loc(2, 1, 0));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: " ;  ",
-    };
+    let mut t = Tokenizer::new(" ;  ");
     assert_eq!(t.take_byte(), None);
     assert_eq!(t.offset, Loc(4, 0, 4));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: " ; hello world ",
-    };
+    let mut t = Tokenizer::new(" ; hello world ");
     assert_eq!(t.take_byte(), None);
     assert_eq!(t.offset, Loc(15, 0, 15));
     assert_eq!(t.text, "");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "1312 ; baca ",
-    };
+    let mut t = Tokenizer::new("1312 ; baca ");
     assert_eq!(
         t.take_byte(),
         Some(Ok(Spanning(0x13, Loc::default(), Loc(2, 0, 2), None))),
@@ -293,10 +254,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.offset, Loc(2, 0, 2));
     assert_eq!(t.text, "12 ; baca ");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "\t\t  4200\n\t\t  1337",
-    };
+    let mut t = Tokenizer::new("\t\t  4200\n\t\t  1337");
     assert_eq!(
         t.take_byte(),
         Some(Ok(Spanning(0x42, Loc(4, 0, 4), Loc(6, 0, 6), None))),
@@ -304,10 +262,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.offset, Loc(6, 0, 6));
     assert_eq!(t.text, "00\n\t\t  1337");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "    f4c3 ; book\n    c00b ; ecaf\n",
-    };
+    let mut t = Tokenizer::new("    f4c3 ; book\n    c00b ; ecaf\n");
     assert_eq!(
         t.take_byte(),
         Some(Ok(Spanning(0xf4, Loc(4, 0, 4), Loc(6, 0, 6), None))),
@@ -315,10 +270,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.offset, Loc(6, 0, 6));
     assert_eq!(t.text, "c3 ; book\n    c00b ; ecaf\n");
 
-    let mut t = Tokenizer {
-        offset: Loc::default(),
-        text: "; lorem ipsum\n; dolor sit amet\nffff",
-    };
+    let mut t = Tokenizer::new("; lorem ipsum\n; dolor sit amet\nffff");
     assert_eq!(
         t.take_byte(),
         Some(Ok(Spanning(0xff, Loc(31, 2, 0), Loc(33, 2, 2), None))),

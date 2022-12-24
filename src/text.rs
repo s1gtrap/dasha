@@ -30,6 +30,12 @@ impl Loc {
     }
 }
 
+impl Default for Loc {
+    fn default() -> Self {
+        Loc(0, 0, 0)
+    }
+}
+
 impl fmt::Display for Loc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
@@ -38,12 +44,12 @@ impl fmt::Display for Loc {
 
 #[test]
 fn test_loc_shift() {
-    assert_eq!(Loc(0, 0, 0).shift(1), Loc(1, 0, 1));
+    assert_eq!(Loc::default().shift(1), Loc(1, 0, 1));
 }
 
 #[test]
 fn test_loc_shift_line() {
-    assert_eq!(Loc(0, 0, 0).shift_line(1), Loc(1, 1, 0));
+    assert_eq!(Loc::default().shift_line(1), Loc(1, 1, 0));
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -162,15 +168,15 @@ impl<'a> Tokenizer<'a> {
 #[test]
 fn test_tokenizer_trim_start() {
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "",
     };
     t.trim_start();
-    assert_eq!(t.offset, Loc(0, 0, 0));
+    assert_eq!(t.offset, Loc::default());
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "  ",
     };
     t.trim_start();
@@ -178,7 +184,7 @@ fn test_tokenizer_trim_start() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "\t\r\n",
     };
     t.trim_start();
@@ -186,7 +192,7 @@ fn test_tokenizer_trim_start() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: " ;  ",
     };
     t.trim_start();
@@ -194,7 +200,7 @@ fn test_tokenizer_trim_start() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: " ; hello world ",
     };
     t.trim_start();
@@ -202,15 +208,15 @@ fn test_tokenizer_trim_start() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "1312 ; baca ",
     };
     t.trim_start();
-    assert_eq!(t.offset, Loc(0, 0, 0));
+    assert_eq!(t.offset, Loc::default());
     assert_eq!(t.text, "1312 ; baca ");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "\t\t  4200\n\t\t  1337",
     };
     t.trim_start();
@@ -218,7 +224,7 @@ fn test_tokenizer_trim_start() {
     assert_eq!(t.text, "4200\n\t\t  1337");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "    f4c3 ; book\n    c00b ; ecaf\n",
     };
     t.trim_start();
@@ -226,7 +232,7 @@ fn test_tokenizer_trim_start() {
     assert_eq!(t.text, "f4c3 ; book\n    c00b ; ecaf\n");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "; lorem ipsum\n; dolor sit amet\nffff",
     };
     t.trim_start();
@@ -237,15 +243,15 @@ fn test_tokenizer_trim_start() {
 #[test]
 fn test_tokenizer_take_byte() {
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "",
     };
     assert_eq!(t.take_byte(), None);
-    assert_eq!(t.offset, Loc(0, 0, 0));
+    assert_eq!(t.offset, Loc::default());
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "  ",
     };
     assert_eq!(t.take_byte(), None);
@@ -253,7 +259,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "\t\r\n",
     };
     assert_eq!(t.take_byte(), None);
@@ -261,7 +267,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: " ;  ",
     };
     assert_eq!(t.take_byte(), None);
@@ -269,7 +275,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: " ; hello world ",
     };
     assert_eq!(t.take_byte(), None);
@@ -277,18 +283,18 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.text, "");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "1312 ; baca ",
     };
     assert_eq!(
         t.take_byte(),
-        Some(Ok(Spanning(0x13, Loc(0, 0, 0), Loc(2, 0, 2), None))),
+        Some(Ok(Spanning(0x13, Loc::default(), Loc(2, 0, 2), None))),
     );
     assert_eq!(t.offset, Loc(2, 0, 2));
     assert_eq!(t.text, "12 ; baca ");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "\t\t  4200\n\t\t  1337",
     };
     assert_eq!(
@@ -299,7 +305,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.text, "00\n\t\t  1337");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "    f4c3 ; book\n    c00b ; ecaf\n",
     };
     assert_eq!(
@@ -310,7 +316,7 @@ fn test_tokenizer_take_byte() {
     assert_eq!(t.text, "c3 ; book\n    c00b ; ecaf\n");
 
     let mut t = Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text: "; lorem ipsum\n; dolor sit amet\nffff",
     };
     assert_eq!(
@@ -331,7 +337,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 pub fn tokenize(text: &str) -> Result<Vec<Spanning<u8, Loc>>, Error> {
     Ok(Tokenizer {
-        offset: Loc(0, 0, 0),
+        offset: Loc::default(),
         text,
     }
     .collect::<Result<Vec<_>, _>>()?)
@@ -341,11 +347,11 @@ pub fn tokenize(text: &str) -> Result<Vec<Spanning<u8, Loc>>, Error> {
 fn test_tokenize() {
     assert_eq!(
         tokenize("0").unwrap(),
-        vec![Spanning(0, Loc(0, 0, 0), Loc(1, 0, 1), None)],
+        vec![Spanning(0, Loc::default(), Loc(1, 0, 1), None)],
     );
     assert_eq!(
         tokenize("00").unwrap(),
-        vec![Spanning(0, Loc(0, 0, 0), Loc(2, 0, 2), None)],
+        vec![Spanning(0, Loc::default(), Loc(2, 0, 2), None)],
     );
     assert_eq!(
         tokenize("  00\r\n").unwrap(),
@@ -354,7 +360,7 @@ fn test_tokenize() {
     assert_eq!(
         tokenize("0 12 345 6789").unwrap(),
         vec![
-            Spanning(0, Loc(0, 0, 0), Loc(1, 0, 1), None),
+            Spanning(0, Loc::default(), Loc(1, 0, 1), None),
             Spanning(0x12, Loc(2, 0, 2), Loc(4, 0, 4), None),
             Spanning(0x34, Loc(5, 0, 5), Loc(7, 0, 7), None),
             Spanning(5, Loc(7, 0, 7), Loc(8, 0, 8), None),
@@ -365,7 +371,7 @@ fn test_tokenize() {
     assert_eq!(
         tokenize("1312 dead beef").unwrap(),
         vec![
-            Spanning(0x13, Loc(0, 0, 0), Loc(2, 0, 2), None),
+            Spanning(0x13, Loc::default(), Loc(2, 0, 2), None),
             Spanning(0x12, Loc(2, 0, 2), Loc(4, 0, 4), None),
             Spanning(0xde, Loc(5, 0, 5), Loc(7, 0, 7), None),
             Spanning(0xad, Loc(7, 0, 7), Loc(9, 0, 9), None),
